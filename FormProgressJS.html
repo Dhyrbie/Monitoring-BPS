@@ -1,0 +1,185 @@
+<script>
+  // SISTEM CACHE: Simpan daftar nama di memori browser agar tidak loading ulang terus-menerus
+  window.cachedEmployeeNames = window.cachedEmployeeNames || [];
+
+  function initFormProgress() {
+    let select = document.getElementById('selectNama');
+    if (!select) return;
+
+    // Jika data nama sudah tersimpan di cache, langsung cetak seketika tanpa loading!
+    if (window.cachedEmployeeNames.length > 0) {
+      renderEmployeeDropdown(window.cachedEmployeeNames, select);
+      return;
+    }
+
+    select.innerHTML = '<option value="">⏳ Memuat daftar nama pekerja...</option>';
+    select.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function(names) {
+        window.cachedEmployeeNames = names; // Simpan data ke cache
+        renderEmployeeDropdown(names, select);
+      })
+      .getEmployeeList();
+  }
+
+  function renderEmployeeDropdown(names, select) {
+    let currentVal = select.value;
+    select.innerHTML = '<option value="">-- Pilih Nama --</option>';
+    if (names && names.length > 0) {
+      names.forEach(n => {
+        select.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`);
+      });
+    }
+    select.disabled = false;
+    if (currentVal && currentVal !== "") select.value = currentVal;
+  }
+
+  function loadTasks() {
+    let selectEl = document.getElementById('selectNama');
+    let container = document.getElementById('taskContainer');
+    if (!selectEl || !container) return;
+    
+    let nama = selectEl.value;
+    if (!nama || nama.trim() === "") {
+      container.innerHTML = '<p class="text-muted text-center py-3">Silakan pilih nama Anda terlebih dahulu.</p>';
+      return;
+    }
+    
+    container.innerHTML = '<p class="text-center py-4 text-secondary"><i class="fa-solid fa-spinner fa-spin fa-lg mb-3"></i><br>Sedang menyinkronkan data tugas dan riwayat Anda...</p>';
+    
+    google.script.run
+      .withSuccessHandler(function(res) {
+        renderTaskAndHistory(res.tasks, res.logs, container);
+      })
+      .withFailureHandler(function(err) {
+        container.innerHTML = '<div class="alert alert-danger text-center">Gagal memuat data: ' + err.message + '</div>';
+      })
+      .getEmployeeData(nama);
+  }
+
+  function renderTaskAndHistory(tasks, logs, container) {
+    let html = '';
+
+    // --- BAGIAN A: TUGAS AKTIF ---
+    html += '<h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-list-check me-2"></i>Daftar Tugas Aktif</h5>';
+    
+    if (!tasks || tasks.length === 0) {
+      html += '<div class="alert alert-success text-center mb-4">Semua tugas penugasan Anda telah selesai! Tidak ada progress yang perlu diinput.</div>';
+    } else {
+      tasks.forEach(t => {
+        let currentRealisasi = (t.role === 'PPL') ? t.realisasiPPL : t.realisasiPML;
+        let sisaTarget = Math.max(0, t.target - currentRealisasi);
+        
+        html += `
+          <div class="card mb-3 shadow-sm border-0 bg-light">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <div>
+                  <h6 class="fw-bold text-primary mb-0">NKS: ${t.nks}</h6>
+                  <span class="badge bg-secondary text-white small mt-1"><i class="fa-solid fa-tag me-1"></i>${t.sensus} (${t.waktuPendataan})</span>
+                </div>
+                <span class="badge ${t.role === 'PPL' ? 'bg-primary' : 'bg-success'} fs-6 px-3 py-2">${t.role}</span>
+              </div>
+              <p class="small text-muted mb-2 mt-2">${t.lokasi}</p>
+              
+              <div class="p-2 bg-white rounded border mb-3 small d-flex justify-content-between text-secondary">
+                <span>Target: <b class="text-dark">${t.target} KK</b></span>
+                <span>Sudah Diinput: <b class="text-success">${currentRealisasi} KK</b></span>
+                <span>Sisa Target: <b class="text-danger">${sisaTarget} KK</b></span>
+              </div>
+
+              <div class="row align-items-center g-2">
+                <div class="col-8">
+                  <label class="form-label small mb-1">Input Progress Tambahan (KK):</label>
+                  <input type="number" id="val_${t.rowIndex}" class="form-control" value="0" max="${sisaTarget}" min="0">
+                </div>
+                <div class="col-4 text-end mt-4">
+                  <button id="btn_${t.rowIndex}" class="btn btn-sm btn-primary w-100 py-2 fw-bold" onclick="saveProgress(${t.rowIndex}, '${t.role}')">Simpan</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // --- BAGIAN B: RIWAYAT / LOG PROGRESS ---
+    html += '<hr class="my-4">';
+    html += '<h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-clock-rotate-left me-2"></i>Riwayat Input Harian Anda</h5>';
+    
+    if (!logs || logs.length === 0) {
+      html += '<p class="text-muted small fst-italic">Belum ada riwayat input progress yang tercatat.</p>';
+    } else {
+      html += `
+        <div class="table-responsive bg-white rounded shadow-sm border p-2">
+          <table class="table table-sm table-hover align-middle small mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Waktu Input</th>
+                <th>NKS</th>
+                <th>Peran</th>
+                <th>Survei</th>
+                <th class="text-center">Jumlah Input</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      logs.forEach(l => {
+        html += `
+          <tr>
+            <td>${l.timestamp}</td>
+            <td><b>${l.nks}</b></td>
+            <td><span class="badge ${l.peran === 'PPL' ? 'bg-primary' : 'bg-success'}">${l.peran}</span></td>
+            <td>${l.survei}</td>
+            <td class="text-center fw-bold text-success">+${l.realisasi} KK</td>
+          </tr>
+        `;
+      });
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+  }
+
+  function saveProgress(rowIndex, role) {
+    let btnEl = document.getElementById('btn_' + rowIndex);
+    if (btnEl && btnEl.disabled) return;
+
+    let valInput = document.getElementById('val_' + rowIndex);
+    if (!valInput) return;
+    
+    let val = valInput.value;
+    if (val === "" || Number(val) <= 0) {
+      alert("Masukkan jumlah realisasi KK yang valid (lebih dari 0).");
+      return;
+    }
+
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.dataset.originalText = btnEl.innerHTML;
+      btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Menyimpan...';
+    }
+
+    let valPPL = (role === 'PPL') ? val : null;
+    let valPML = (role === 'PML') ? val : null;
+    
+    google.script.run
+      .withSuccessHandler(function(msg) {
+        alert(msg);
+        loadTasks();
+      })
+      .withFailureHandler(function(err) {
+        alert("Gagal menyimpan: " + err.message);
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = btnEl.dataset.originalText || 'Simpan';
+        }
+      })
+      .updateTaskProgress(rowIndex, valPPL, valPML);
+  }
+</script>

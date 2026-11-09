@@ -1,0 +1,340 @@
+<script>
+  let barChartInstance = null;
+  let donutChartInstance = null;
+  let dailyChartInstance = null;
+  
+  let globalDetailTugas = [];
+  let currentPage = 1;
+
+  window.addEventListener('DOMContentLoaded', function() {
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res) return;
+      
+      let selectNama = document.getElementById('filterNama');
+      selectNama.innerHTML = '<option value="Semua">Semua Petugas</option>'; // Teks disesuaikan
+      res.names.forEach(n => selectNama.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`));
+
+      let selectWaktu = document.getElementById('filterWaktu');
+      selectWaktu.innerHTML = '<option value="Semua">-- Semua Waktu Pendataan --</option>';
+      res.waktus.forEach(w => selectWaktu.insertAdjacentHTML('beforeend', `<option value="${w}">${w}</option>`));
+
+      let container = document.getElementById('sensusCheckboxContainer');
+      container.innerHTML = `<div class="form-check form-check-inline">
+                               <input class="form-check-input sensus-cb" type="checkbox" value="Semua" id="cbSensusSemua" checked onchange="handleSensusCheckboxChange('Semua')">
+                               <label class="form-check-label" for="cbSensusSemua">Semua Survei</label> <!-- Teks disesuaikan -->
+                             </div>`;
+      res.sensus.forEach((sName, idx) => {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="form-check form-check-inline">
+            <input class="form-check-input sensus-cb" type="checkbox" value="${sName}" id="cbSensus${idx}" onchange="handleSensusCheckboxChange('${sName}')">
+            <label class="form-check-label" for="cbSensus${idx}">${sName}</label>
+          </div>
+        `);
+      });
+
+      renderDashboardSummary(res.summary);
+    }).getInitialDashboardData();
+  });
+
+  // FUNGSI BARU: Logika Tombol Refresh Data
+  function refreshData() {
+    let btn = document.getElementById('btnRefresh');
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Menyegarkan...';
+      btn.disabled = true;
+    }
+    
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res) return;
+      
+      // Update Dropdown Nama (Pertahankan pilihan saat ini)
+      let selectNama = document.getElementById('filterNama');
+      let currentNama = selectNama.value;
+      selectNama.innerHTML = '<option value="Semua">Semua Petugas</option>';
+      res.names.forEach(n => selectNama.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`));
+      selectNama.value = currentNama || 'Semua';
+
+      // Update Dropdown Waktu (Triwulan III otomatis masuk ke sini)
+      let selectWaktu = document.getElementById('filterWaktu');
+      let currentWaktu = selectWaktu.value;
+      selectWaktu.innerHTML = '<option value="Semua">-- Semua Waktu Pendataan --</option>';
+      res.waktus.forEach(w => selectWaktu.insertAdjacentHTML('beforeend', `<option value="${w}">${w}</option>`));
+      selectWaktu.value = currentWaktu || 'Semua';
+
+      // Update Checkbox Survei
+      let container = document.getElementById('sensusCheckboxContainer');
+      let checkedVals = getSelectedSensusArray();
+      container.innerHTML = `<div class="form-check form-check-inline">
+                               <input class="form-check-input sensus-cb" type="checkbox" value="Semua" id="cbSensusSemua" ${checkedVals.includes('Semua') ? 'checked' : ''} onchange="handleSensusCheckboxChange('Semua')">
+                               <label class="form-check-label" for="cbSensusSemua">Semua Survei</label>
+                             </div>`;
+      res.sensus.forEach((sName, idx) => {
+        let isChecked = checkedVals.includes(sName) ? 'checked' : '';
+        container.insertAdjacentHTML('beforeend', `
+          <div class="form-check form-check-inline">
+            <input class="form-check-input sensus-cb" type="checkbox" value="${sName}" id="cbSensus${idx}" ${isChecked} onchange="handleSensusCheckboxChange('${sName}')">
+            <label class="form-check-label" for="cbSensus${idx}">${sName}</label>
+          </div>
+        `);
+      });
+
+      // Kembalikan Tombol & Render Chart Terbaru
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-arrows-rotate me-1"></i> Refresh Data';
+        btn.disabled = false;
+      }
+      renderDashboardSummary(res.summary);
+      
+    }).forceRefreshDashboardData();
+  }
+
+  function handleSensusCheckboxChange(changedVal) {
+    let cbSemua = document.getElementById('cbSensusSemua');
+    let checkboxes = document.querySelectorAll('.sensus-cb:not(#cbSensusSemua)');
+    if (changedVal === 'Semua') {
+      if (cbSemua.checked) checkboxes.forEach(cb => cb.checked = false);
+    } else {
+      let anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+      if (anyChecked) cbSemua.checked = false;
+      else cbSemua.checked = true;
+    }
+    fetchDashboardData();
+  }
+
+  function getSelectedSensusArray() {
+    let cbSemua = document.getElementById('cbSensusSemua');
+    if (cbSemua.checked) return ['Semua'];
+    let checkboxes = document.querySelectorAll('.sensus-cb:not(#cbSensusSemua)');
+    let selected = [];
+    checkboxes.forEach(cb => { if (cb.checked) selected.push(cb.value); });
+    return selected.length > 0 ? selected : ['Semua'];
+  }
+
+  function fetchDashboardData() {
+    let filterNama = document.getElementById('filterNama').value;
+    let filterWaktu = document.getElementById('filterWaktu').value;
+    let filterSensusArray = getSelectedSensusArray();
+    
+    google.script.run.withSuccessHandler(function(res) {
+      if (res) renderDashboardSummary(res);
+    }).getDashboardSummary(filterNama, filterWaktu, filterSensusArray);
+  }
+
+  function renderDashboardSummary(res) {
+    document.getElementById('kpiTarget').innerText = res.totalTarget + ' KK';
+    document.getElementById('kpiPPL').innerHTML = res.totalPPL + ' KK (' + res.percentPPL + '%)';
+    document.getElementById('kpiPML').innerHTML = res.totalPML + ' KK (' + res.percentPML + '%)';
+    
+    // CHART 1: DONUT CHART CAPAIAN TEPAT WAKTU
+    if (donutChartInstance) donutChartInstance.destroy();
+    
+    let titleEl = document.getElementById('leftChartTitle');
+    if (titleEl) titleEl.innerText = "Capaian Tepat Waktu (%)";
+
+    let ctxDonut = document.getElementById('lineChart').getContext('2d');
+    donutChartInstance = new Chart(ctxDonut, {
+      type: 'doughnut',
+      data: {
+        labels: ['Tepat Waktu', 'Terlambat', 'Dalam Proses'],
+        datasets: [{
+          data: [res.donutData.tepatWaktu, res.donutData.terlambat, res.donutData.dalamProses],
+          backgroundColor: ['#198754', '#dc3545', '#ffc107'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true, 
+        maintainAspectRatio: false,
+        cutout: '75%', 
+        plugins: { 
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+        }
+      },
+      plugins: [{
+        id: 'centerText',
+        beforeDraw: function(chart) {
+          if (chart.getDatasetMeta(0).data.length === 0) return;
+          let ctx = chart.ctx;
+          ctx.restore();
+          
+          let meta = chart.getDatasetMeta(0);
+          if (!meta.data.length) return;
+          let centerX = meta.data[0].x;
+          let centerY = meta.data[0].y;
+          
+          let height = chart.chartArea.bottom - chart.chartArea.top;
+          
+          let fontSize = (height / 110).toFixed(2);
+          ctx.font = "bold " + fontSize + "em sans-serif";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#212529";
+          
+          let text = res.donutData.persenTepat + "%";
+          let textX = centerX - (ctx.measureText(text).width / 2);
+          let textY = centerY - 10;
+          ctx.fillText(text, textX, textY);
+          
+          let fontSub = (height / 250).toFixed(2);
+          ctx.font = fontSub + "em sans-serif";
+          ctx.fillStyle = "#6c757d";
+          let text2 = "On-Time";
+          let text2X = centerX - (ctx.measureText(text2).width / 2);
+          let text2Y = centerY + 15;
+          ctx.fillText(text2, text2X, text2Y);
+          
+          ctx.save();
+        }
+      }]
+    });
+    
+    // CHART 2: BAR CHART
+    if (barChartInstance) barChartInstance.destroy();
+    let barChartLabels = res.waktuLabels;
+    let wData = res.waktuBarData;
+    let pTepatVals = barChartLabels.map(w => wData[w] ? wData[w].pplTepat : 0);
+    let pTerlVals  = barChartLabels.map(w => wData[w] ? wData[w].pplTerlambat : 0);
+    let mTepatVals = barChartLabels.map(w => wData[w] ? wData[w].pmlTepat : 0);
+    let mTerlVals  = barChartLabels.map(w => wData[w] ? wData[w].pmlTerlambat : 0);
+
+    let ctxBar = document.getElementById('barChart').getContext('2d');
+    barChartInstance = new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels: barChartLabels,
+        datasets: [
+          { label: 'PPL Tepat', data: pTepatVals, backgroundColor: '#0d6efd', borderRadius: 3 },
+          { label: 'PPL Terlambat', data: pTerlVals, backgroundColor: '#dc3545', borderRadius: 3 },
+          { label: 'PML Tepat', data: mTepatVals, backgroundColor: '#198754', borderRadius: 3 },
+          { label: 'PML Terlambat', data: mTerlVals, backgroundColor: '#fd7e14', borderRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+        scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { beginAtZero: true } }
+      }
+    });
+
+    // CHART 3: TREN HARIAN
+    if (dailyChartInstance) dailyChartInstance.destroy();
+    let ctxDaily = document.getElementById('dailyTrendChart').getContext('2d');
+    dailyChartInstance = new Chart(ctxDaily, {
+      type: 'line',
+      data: {
+        labels: res.dailyTrendLabels || [],
+        datasets: [{
+          label: 'Input Harian (KK)', data: res.dailyTrendData || [],
+          borderColor: '#6f42c1', backgroundColor: 'rgba(111, 66, 193, 0.1)',
+          borderWidth: 2, tension: 0.3, fill: true, pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f0f0' } }
+        }
+      }
+    });
+    
+    globalDetailTugas = res.detailTugas || [];
+    currentPage = 1;
+    renderTable();
+  }
+
+  function handleTableSearch() { currentPage = 1; renderTable(); }
+  function changeRowsPerPage() { currentPage = 1; renderTable(); }
+  function changePage(page) { currentPage = page; renderTable(); }
+
+  function renderTable() {
+    let tbody = document.getElementById('tableDetailBody');
+    let infoText = document.getElementById('tableInfoText');
+    let paginationDiv = document.getElementById('paginationControls');
+    let statusFilterVal = document.getElementById('statusFilterSelect').value;
+    let searchVal = document.getElementById('tableSearchInput').value.toLowerCase().trim();
+    let rowsPerPageVal = document.getElementById('rowsPerPageSelect').value;
+
+    let filteredData = globalDetailTugas.filter(t => {
+      let statusText = '';
+      if (t.isPPLTerlambat && t.isPMLTerlambat) statusText = 'Terlambat (Semua)';
+      else if (t.isPPLTerlambat) statusText = 'Terlambat PPL';
+      else if (t.isPMLTerlambat) statusText = 'Terlambat PML';
+      else if (t.realisasiPPL >= t.target && t.realisasiPML >= t.target) statusText = 'Selesai';
+      else statusText = 'Dalam Proses';
+
+      let matchStatus = true;
+      if (statusFilterVal !== 'Semua Status' && statusFilterVal !== 'Semua' && statusFilterVal !== '') {
+        if (statusFilterVal === 'Terlambat (Semua)') matchStatus = t.isPPLTerlambat || t.isPMLTerlambat; 
+        else if (statusFilterVal === 'Terlambat PPL') matchStatus = t.isPPLTerlambat; 
+        else if (statusFilterVal === 'Terlambat PML') matchStatus = t.isPMLTerlambat; 
+        else matchStatus = statusText.toLowerCase() === statusFilterVal.toLowerCase();
+      }
+
+      let matchSearch = true;
+      if (searchVal) {
+        let combined = (t.nks + ' ' + t.lokasi + ' ' + t.ppl + ' ' + t.pml + ' ' + t.sensus + ' ' + t.waktuPendataan + ' ' + statusText).toLowerCase();
+        matchSearch = combined.includes(searchVal);
+      }
+      return matchStatus && matchSearch;
+    });
+
+    let totalData = filteredData.length;
+    if (totalData === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">Tidak ada data penugasan yang cocok dengan filter.</td></tr>';
+      infoText.innerText = 'Menampilkan 0 dari 0 data';
+      paginationDiv.innerHTML = '';
+      return;
+    }
+
+    let rowsPerPage = rowsPerPageVal === 'all' ? totalData : parseInt(rowsPerPageVal);
+    let totalPages = Math.ceil(totalData / rowsPerPage);
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    let startIndex = (currentPage - 1) * rowsPerPage;
+    let endIndex = rowsPerPageVal === 'all' ? totalData : Math.min(startIndex + rowsPerPage, totalData);
+    let paginatedData = filteredData.slice(startIndex, endIndex);
+    
+    let html = '';
+    paginatedData.forEach((t, index) => {
+      let globalIndex = startIndex + index + 1;
+      let statusBadge = '';
+      if (t.isPPLTerlambat && t.isPMLTerlambat) statusBadge = '<span class="badge bg-danger">Terlambat (Semua)</span>';
+      else if (t.isPPLTerlambat) statusBadge = '<span class="badge bg-danger">Terlambat PPL</span>';
+      else if (t.isPMLTerlambat) statusBadge = '<span class="badge bg-danger">Terlambat PML</span>';
+      else if (t.realisasiPPL >= t.target && t.realisasiPML >= t.target) statusBadge = '<span class="badge bg-success">Selesai</span>';
+      else statusBadge = '<span class="badge bg-warning text-dark">Dalam Proses</span>';
+
+      html += `<tr>
+          <td>${globalIndex}</td>
+          <td><b>${t.nks}</b></td>
+          <td>${t.waktuPendataan}</td>
+          <td>${t.sensus}</td>
+          <td>${t.lokasi}</td>
+          <td>${t.ppl}</td>
+          <td>${t.pml}</td>
+          <td class="text-center">${t.target}</td>
+          <td class="text-center">${t.realisasiPPL}</td>
+          <td class="text-center">${t.realisasiPML}</td>
+          <td class="text-center">${statusBadge}</td>
+        </tr>`;
+    });
+    
+    tbody.innerHTML = html;
+    infoText.innerText = `Menampilkan ${startIndex + 1} - ${endIndex} dari ${totalData} data`;
+    
+    let pagHtml = '';
+    if (rowsPerPageVal !== 'all' && totalPages > 1) {
+      pagHtml += `<button class="btn btn-outline-secondary btn-sm" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">‹ Prev</button>`;
+      let startP = Math.max(1, currentPage - 2);
+      let endP = Math.min(totalPages, startP + 4);
+      for (let p = startP; p <= endP; p++) {
+        pagHtml += `<button class="btn ${p === currentPage ? 'btn-primary' : 'btn-outline-secondary'} btn-sm" onclick="changePage(${p})">${p}</button>`;
+      }
+      pagHtml += `<button class="btn btn-outline-secondary btn-sm" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next ›</button>`;
+    }
+    paginationDiv.innerHTML = pagHtml;
+  }
+</script>

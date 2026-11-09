@@ -1,0 +1,163 @@
+<div class="container-fluid px-0">
+  
+  <!-- FILTER SECTION -->
+  <div class="card border-0 shadow-sm p-3 mb-4 rounded-3">
+    <div class="row g-3">
+      
+      <!-- Filter Petugas -->
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-secondary">FILTER PETUGAS (PPL / PML):</label>
+        <select id="filterNama" class="form-select form-select-sm" onchange="fetchDashboardData()">
+          <option value="Semua">Semua Petugas</option>
+        </select>
+      </div>
+      
+      <!-- Filter Waktu / Bulan Pendataan -->
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-secondary">FILTER WAKTU / BULAN PENDATAAN:</label>
+        <select id="filterWaktu" class="form-select form-select-sm" onchange="fetchDashboardData()">
+          <option value="Semua">-- Semua Waktu Pendataan --</option>
+        </select>
+      </div>
+
+      <!-- Tombol Refresh (Sudah diperbaiki) -->
+      <div class="col-md-4 d-flex align-items-end">
+        <button id="btnRefresh" class="btn btn-outline-primary btn-sm w-100 fw-bold" onclick="refreshData()">
+          <i class="fa-solid fa-rotate me-2"></i>Refresh Data
+        </button>
+      </div>
+      
+    </div>
+    <!-- Filter Jenis Sensus / Survei (Checkbox Dinamis) -->
+    <div class="row mt-3">
+      <div class="col-12">
+        <label class="form-label small fw-bold text-secondary">FILTER JENIS SENSUS / SURVEI:</label>
+        <div id="sensusCheckboxContainer" class="p-2 bg-light rounded border d-flex flex-wrap gap-3 align-items-center">
+          <span class="text-muted small">Memuat daftar survei...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm p-3 border-start border-primary border-4 rounded-3 h-100">
+        <small class="text-muted fw-bold text-uppercase">Total Target Volume</small>
+        <h3 class="fw-bold mt-2 mb-0 text-dark" id="kpiTarget">0 KK</h3>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm p-3 border-start border-primary border-4 rounded-3 h-100">
+        <small class="text-muted fw-bold text-uppercase">Total Pendataan PPL</small>
+        <h3 class="fw-bold mt-2 mb-0 text-primary" id="kpiPPL">0 KK (0%)</h3>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm p-3 border-start border-success border-4 rounded-3 h-100">
+        <small class="text-muted fw-bold text-uppercase">Total Pemeriksaan PML</small>
+        <h3 class="fw-bold mt-2 mb-0 text-success" id="kpiPML">0 KK (0%)</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS SECTION (3 CHART BERJEJER KE SAMPING) -->
+  <div class="row g-3 mb-4">
+    <!-- Chart 1: Tren Sensus / Donut -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm p-3 rounded-3 h-100">
+        <h6 class="fw-bold text-dark mb-3" id="leftChartTitle" style="font-size: 0.9rem;">Capaian Tepat Waktu (%)</h6>
+        <div id="leftChartContainer" style="position: relative; height: 260px; width: 100%;">
+          <canvas id="lineChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Chart 2: Evaluasi Ketepatan Waktu -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm p-3 rounded-3 h-100">
+        <h6 class="fw-bold text-dark mb-3" style="font-size: 0.9rem;">Evaluasi Ketepatan Waktu Petugas</h6>
+        <div style="position: relative; height: 260px; width: 100%;">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart 3: Tren Produktivitas Harian (Log Progress) -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm p-3 rounded-3 h-100">
+        <h6 class="fw-bold text-dark mb-3" style="font-size: 0.9rem;">Tren Produktivitas Harian (KK)</h6>
+        <div style="position: relative; height: 260px; width: 100%;">
+          <canvas id="dailyTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL TABLE SECTION -->
+  <div class="card border-0 shadow-sm p-3 rounded-3">
+    <!-- Header Tabel + Filter Status & Search Bar -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+      <h6 class="fw-bold text-dark mb-0">Tabel Detail Penugasan & Kinerja NKS</h6>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <!-- Dropdown Filter Status -->
+        <div style="width: 160px;">
+          <select id="statusFilterSelect" class="form-select form-select-sm" onchange="handleTableSearch()">
+            <option value="Semua Status">Semua Status</option>
+            <option value="Selesai">Selesai</option>
+            <option value="Terlambat (Semua)">Terlambat (Semua)</option>
+            <option value="Terlambat PPL">Terlambat PPL</option>
+            <option value="Terlambat PML">Terlambat PML</option>
+            <option value="Dalam Proses">Dalam Proses</option>
+          </select>
+        </div>
+        <!-- Search Bar -->
+        <div style="width: 240px;">
+          <input type="text" id="tableSearchInput" class="form-control form-control-sm" placeholder="🔍 Cari NKS/Lokasi..." oninput="handleTableSearch()">
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle small">
+        <thead class="table-light">
+          <tr>
+            <th>No</th>
+            <th>NKS</th>
+            <th>Waktu Pendataan</th>
+            <th>Sensus</th>
+            <th>Lokasi</th>
+            <th>PPL</th>
+            <th>PML</th>
+            <th class="text-center">Target</th>
+            <th class="text-center">Realisasi PPL</th>
+            <th class="text-center">Realisasi PML</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableDetailBody">
+          <tr>
+            <td colspan="11" class="text-center text-muted">Memuat data...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PAGINATION & ROWS PER PAGE DI BAWAH KANAN -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-3 gap-2">
+      <div id="tableInfoText" class="small text-muted">Menampilkan 0 dari 0 data</div>
+      <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+          <label class="small text-muted mb-0">Tampilkan:</label>
+          <select id="rowsPerPageSelect" class="form-select form-select-sm" style="width: 85px;" onchange="changeRowsPerPage()">
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="all">Semua</option>
+          </select>
+        </div>
+        <div id="paginationControls" class="btn-group btn-group-sm"></div>
+      </div>
+    </div>
+  </div>
+</div>

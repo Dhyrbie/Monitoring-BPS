@@ -1,0 +1,93 @@
+<div class="card form-card p-4 shadow-sm mx-auto border-0" style="max-width: 650px;">
+  <h5 class="fw-bold text-center mb-4 text-primary">Input Penugasan NKS Baru (Admin)</h5>
+  <form id="formPenugasan" onsubmit="handleFormSubmit(event)">
+    
+    <!-- KECAMATAN & DESA -->
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label small fw-bold">Pilih / Ketik Nama Kecamatan</label>
+        <select id="selectKec" class="form-select mb-2" onchange="handleKecamatanChange()" required>
+          <option value="">-- Memuat Kecamatan --</option>
+        </select>
+        <input type="text" id="namaKecManual" class="form-control" placeholder="Atau ketik nama kecamatan..." style="display: none;">
+      </div>
+      
+      <div class="col-6">
+        <label class="form-label small fw-bold">Nama Desa / Kelurahan</label>
+        <input type="text" id="namaDesa" class="form-control" placeholder="Cth: JATIMAKMUR" required>
+      </div>
+    </div>
+
+    <!-- KODE DESA & SLS -->
+    <div class="row g-2 mb-3">
+      <div class="col-4">
+        <label class="form-label small">Kode Desa (Opsional)</label>
+        <input type="text" id="kodeDesa" class="form-control" placeholder="Cth: 008">
+      </div>
+      <div class="col-4">
+        <label class="form-label small">Kode SLS</label>
+        <input type="text" id="kodeSLS" class="form-control" placeholder="Cth: 0050" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small">Sub SLS</label>
+        <input type="text" id="kodeSubSLS" class="form-control" placeholder="Cth: 02" required>
+      </div>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-12">
+        <label class="form-label small">NKS</label>
+        <input type="text" id="nks" class="form-control" placeholder="Cth: 50069" required>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small">Nama SLS / RT RW</label>
+      <input type="text" id="namaSLS" class="form-control" placeholder="Cth: RT 008 RW 009" required>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label small">Nama PPL</label>
+        <input type="text" id="namaPPL" class="form-control" required>
+      </div>
+      <div class="col-6">
+        <label class="form-label small">Nama PML</label>
+        <input type="text" id="namaPML" class="form-control" required>
+      </div>
+    </div>
+
+    <!-- NAMA SENSUS, WAKTU PENDATAAN & TARGET VOLUME -->
+    <div class="row g-2 mb-3">
+      <div class="col-5">
+        <label class="form-label small">Nama Sensus</label>
+        <input type="text" id="namaSensus" class="form-control" placeholder="Susenas, Seruti" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small">Waktu / Bulan Pendataan</label>
+        <input type="text" id="waktuPendataan" class="form-control" placeholder="Cth: Maret" required>
+      </div>
+      <div class="col-3">
+        <label class="form-label small">Target Volume</label>
+        <input type="number" id="targetVolume" class="form-control" value="10" min="1" required>
+      </div>
+    </div>
+
+    <div class="row g-2 mb-4">
+      <div class="col-4">
+        <label class="form-label small">Tgl Mulai</label>
+        <input type="date" id="tglMulai" class="form-control" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small">Deadline PPL</label>
+        <input type="date" id="tglDeadlinePPL" class="form-control" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small">Deadline PML</label>
+        <input type="date" id="tglDeadlinePML" class="form-control" required>
+      </div>
+    </div>
+
+    <button type="submit" id="btnSubmit" class="btn btn-success w-100 py-2 fw-bold">Simpan Penugasan</button>
+  </form>
+</div>

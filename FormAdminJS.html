@@ -1,0 +1,98 @@
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    loadMasterKecamatanNames();
+  });
+
+  function loadMasterKecamatanNames() {
+    google.script.run
+      .withSuccessHandler(function(names) {
+        let select = document.getElementById('selectKec');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">-- Pilih Kecamatan --</option>';
+        if (names && names.length > 0) {
+          names.forEach(n => {
+            let opt = document.createElement('option');
+            opt.value = n;
+            opt.innerText = n;
+            select.appendChild(opt);
+          });
+        }
+        let manualOpt = document.createElement('option');
+        manualOpt.value = 'MANUAL';
+        manualOpt.innerText = '+ Ketik Manual (Lainnya)';
+        select.appendChild(manualOpt);
+      })
+      .getMasterKecamatan();
+  }
+
+  function handleKecamatanChange() {
+    let select = document.getElementById('selectKec');
+    let manualInput = document.getElementById('namaKecManual');
+
+    if (select.value === 'MANUAL') {
+      manualInput.style.display = 'block';
+      manualInput.required = true;
+      manualInput.value = '';
+    } else {
+      manualInput.style.display = 'none';
+      manualInput.required = false;
+    }
+  }
+
+  function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    let selectKec = document.getElementById('selectKec').value;
+    let finalNamaKec = '';
+
+    if (selectKec === 'MANUAL') {
+      finalNamaKec = document.getElementById('namaKecManual').value.trim();
+    } else {
+      finalNamaKec = selectKec;
+    }
+
+    if (!finalNamaKec) {
+      alert("Nama Kecamatan wajib diisi!");
+      return;
+    }
+
+    let btn = document.getElementById('btnSubmit');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    let formData = {
+      namaKecamatan: finalNamaKec,
+      namaDesa: document.getElementById('namaDesa').value.trim(),
+      kodeDesa: document.getElementById('kodeDesa').value.trim(),
+      kodeSLS: document.getElementById('kodeSLS').value.trim(),
+      kodeSubSLS: document.getElementById('kodeSubSLS').value.trim(),
+      nks: document.getElementById('nks').value.trim(),
+      namaSLS: document.getElementById('namaSLS').value.trim(),
+      namaPPL: document.getElementById('namaPPL').value.trim(),
+      namaPML: document.getElementById('namaPML').value.trim(),
+      namaSensus: document.getElementById('namaSensus').value.trim(),
+      waktuPendataan: document.getElementById('waktuPendataan').value.trim(),
+      targetVolume: Number(document.getElementById('targetVolume').value) || 10,
+      tglMulai: document.getElementById('tglMulai').value,
+      tglDeadlinePPL: document.getElementById('tglDeadlinePPL').value,
+      tglDeadlinePML: document.getElementById('tglDeadlinePML').value
+    };
+
+    google.script.run
+      .withSuccessHandler(function(msg) {
+        alert(msg);
+        document.getElementById('formPenugasan').reset();
+        document.getElementById('namaKecManual').style.display = 'none';
+        loadMasterKecamatanNames();
+        btn.disabled = false;
+        btn.innerText = "Simpan Penugasan";
+      })
+      .withFailureHandler(function(err) {
+        alert("Gagal menyimpan data: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Simpan Penugasan";
+      })
+      .addNewTask(formData);
+  }
+</script>
